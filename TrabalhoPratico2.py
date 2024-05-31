@@ -45,7 +45,7 @@ def corretor(id, sem):
             shared_memory.seek(acao_id * 8)
             acao_value = struct.unpack('d', shared_memory.read(8))[0]
 
-            #Simlula a compra/venda de ações
+            #Simulação da compra e venda de ações
             operacao = 'compra' if random.random() > 0.5 else 'venda'
             print(f'Corretor {id} {operacao} ação {acao_id} ao preço de {acao_value}')
             with open(f'log_corretor{id}.txt', 'a') as log_corretor:
@@ -53,3 +53,39 @@ def corretor(id, sem):
 
         #Intervalo entre as operações
         time.sleep(random.uniform(1, 3))
+
+
+# Função do Policial da Bolsa
+def policial(sem):
+    valor_referencia = [50] * 20  # Valor de referência inicial para cada ação
+    while True:
+        with sem:
+            with open('log_policial.txt', 'a') as log_policial:
+                for i in range(20):
+                    shared_memory.seek(i * 8)
+                    valor_acao = struct.unpack('d', shared_memory.read(8))[0]
+                    variacao = abs(valor_acao - valor_referencia[i]) / valor_referencia[i]
+                    if variacao > 0.25:
+                        log_policial.write(f'Negociação suspensa para ação {i} devido a variação de {variacao * 100:.2f}%\n')
+        time.sleep(10)  # Verifica variações a cada 10 segundos
+
+# Criação dos Processos
+if __name__ == '__main__':
+    # Processo servidor
+    servidor_proc = Process(target=servidor, args=(sem,))
+    servidor_proc.start()
+
+    # Processos clientes (corretores)
+    for i in range(10):
+        corretor_proc = Process(target=corretor, args=(i, sem))
+        corretor_proc.start()
+
+    # Processo policial
+    policial_proc = Process(target=policial, args=(sem,))
+    policial_proc.start()
+
+    # Aguardar processos
+    servidor_proc.join()
+    policial_proc.join()
+    for proc in multiprocessing.active_children():
+        proc.join()
