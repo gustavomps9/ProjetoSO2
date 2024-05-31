@@ -72,34 +72,34 @@ def corretor(id, sem, acoes_suspensas):
             if not acoes_suspensas[acao_id]:
                 shared_memory.seek(acao_id * 8)
                 acao_value = struct.unpack('d', shared_memory.read(8))[0]
-                # Simulação de compra/venda
+                # Simulação de compra e venda de ações
                 operacao = 'compra' ou 'venda'
                 empresa = empresas[acao_id]
                 valor_operacao = round(acao_value + random.uniform(-5, 5), 2)
-                print(f'Corretor {id} {operacao} ação {empresa} ao preço de {valor_operacao:.2f}')
+                print(f'Corretor {id} {operacao} ação {empresa} ao preço de {valor_operacao:.2f} euros')
                 with open(f'log_corretor_{id}.txt', 'a') as log_corretor:
-                    log_corretor.write(f'{operacao} ação {empresa}: {valor_operacao:.2f}\n')
+                    log_corretor.write(f'{operacao} ação {empresa}: {valor_operacao:.2f} euros\n')
         # Intervalo entre as operações
         time.sleep(random.uniform(1, 3))
 
-# Função do Policial da Bolsa
-def policial(sem, acoes_suspensas):
+# Função do Policia da Bolsa
+def policia(sem, acoes_suspensas):
     while True:
         with sem:
-            with open('log_policial.txt', 'a') as log_policial:
+            with open('log_policia.txt', 'a') as log_policia:
                 for i, empresa in enumerate(empresas):
                     shared_memory.seek(i * 8)
                     valor_acao = struct.unpack('d', shared_memory.read(8))[0]
                     variacao = abs(valor_acao - valor_referencia[i]) / valor_referencia[i]
                     if variacao > 0.25:
-                        log_policial.write(f'Negociação suspensa para ação {empresa} devido a variação de {variacao * 100:.2f}%\n')
+                        log_policia.write(f'Negociação suspensa para ação {empresa} devido a variação de {variacao * 100:.2f}%\n')
                         # Suspende a ação
                         acoes_suspensas[i] = True
                         # Reseta o valor da ação para o valor de referência
                         shared_memory.seek(i * 8)
                         shared_memory.write(struct.pack('d', valor_referencia[i]))
                     elif acoes_suspensas[i]:
-                        log_policial.write(f'Negociação retomada para ação {empresa}\n')
+                        log_policia.write(f'Negociação retomada para ação {empresa}\n')
                         acoes_suspensas[i] = False
         time.sleep(10)  # Verifica variações a cada 10 segundos
 
@@ -114,12 +114,12 @@ if __name__ == '__main__':
         corretor_proc = Process(target=corretor, args=(i, sem, acoes_suspensas))
         corretor_proc.start()
 
-    # Processo policial
-    policial_proc = Process(target=policial, args=(sem, acoes_suspensas))
-    policial_proc.start()
+    # Processo policia
+    policia_proc = Process(target=policia, args=(sem, acoes_suspensas))
+    policia_proc.start()
 
     # Aguardar processos
     servidor_proc.join()
-    policial_proc.join()
+    policia_proc.join()
     for proc in multiprocessing.active_children():
         proc.join()
